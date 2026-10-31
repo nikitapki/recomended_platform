@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mall-insight-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mall_insight
+      POSTGRES_USER: mall_insight_dev
+      POSTGRES_PASSWORD: mall_insight_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - mall_insight_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mall_insight_dev -d mall_insight"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+volumes:
+  mall_insight_postgres_data:

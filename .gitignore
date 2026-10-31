@@ -1,0 +1,13 @@
+# Local environment and database files
+.env
+.env.*
+!.env.example
+*.local
+
+# Prisma generated client and local tooling state
+backend/src/generated/
+backend/prisma/dev.db
+backend/prisma/dev.db-journal
+
+# Docker volumes are named, but ignore a local bind-mounted data directory too
+postgres-data/

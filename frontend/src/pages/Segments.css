@@ -1,0 +1,364 @@
+.segments-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.segments-layout {
+  display: grid;
+  grid-template-columns: minmax(250px, 0.8fr) minmax(0, 2fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.segments-saved-list,
+.segment-builder,
+.segment-results,
+.segment-customer-card {
+  padding: 24px;
+}
+
+.segments-card-heading,
+.segment-conditions-heading,
+.segment-builder-footer,
+.saved-segment,
+.segment-condition {
+  display: flex;
+  align-items: center;
+}
+
+.segments-card-heading,
+.segment-conditions-heading,
+.segment-builder-footer {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.segments-card-heading h2,
+.segment-conditions-heading h3 {
+  margin: 0;
+  color: #1d2939;
+}
+
+.segments-card-heading p,
+.segment-conditions-heading span,
+.segment-builder-footer > span {
+  margin: 6px 0 0;
+  color: #667085;
+  font-size: 14px;
+}
+
+.saved-segments-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.saved-segment {
+  gap: 6px;
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+  padding: 4px;
+}
+
+.saved-segment.active {
+  border-color: #7f56d9;
+  background: #f9f5ff;
+}
+
+.saved-segment-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px;
+  background: transparent;
+  color: #344054;
+  text-align: left;
+}
+
+.saved-segment-main span {
+  color: #667085;
+  font-size: 12px;
+}
+
+.saved-segment-delete,
+.remove-condition {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #98a2b3;
+}
+
+.saved-segment-delete:hover,
+.remove-condition:hover:not(:disabled) {
+  background: #fef3f2;
+  color: #d92d20;
+}
+
+.remove-condition:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.segments-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 42px 16px;
+  color: #667085;
+  text-align: center;
+}
+
+.segments-empty-state svg {
+  color: #9e77ed;
+}
+
+.segments-empty-state strong {
+  color: #344054;
+}
+
+.segments-empty-state span {
+  font-size: 14px;
+}
+
+.segment-form-fields {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.segment-form-fields label {
+  display: grid;
+  gap: 8px;
+  color: #344054;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.segment-form-fields input,
+.segment-form-fields textarea,
+.segment-condition select,
+.segment-condition input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  color: #344054;
+  font: inherit;
+}
+
+.segment-form-fields textarea {
+  resize: vertical;
+}
+
+.segment-form-fields input:focus,
+.segment-form-fields textarea:focus,
+.segment-condition select:focus,
+.segment-condition input:focus {
+  outline: 2px solid #d9d6fe;
+  border-color: #7f56d9;
+}
+
+.segment-conditions-heading {
+  margin-top: 28px;
+  padding-top: 22px;
+  border-top: 1px solid #eaecf0;
+}
+
+.segment-conditions-heading h3 {
+  font-size: 16px;
+}
+
+.segment-conditions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.segment-condition {
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #eaecf0;
+  border-radius: 10px;
+  background: #fcfcfd;
+}
+
+.condition-number {
+  display: inline-flex;
+  flex: 0 0 24px;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f4ebff;
+  color: #6941c6;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.segment-condition select:first-of-type {
+  flex: 1.4;
+}
+
+.segment-condition select,
+.segment-condition input {
+  flex: 1;
+}
+
+.condition-operator {
+  flex: 1;
+  color: #475467;
+  font-size: 14px;
+}
+
+.segment-error {
+  margin-top: 16px;
+  border-radius: 8px;
+  padding: 11px 12px;
+  background: #fef3f2;
+  color: #b42318;
+  font-size: 14px;
+}
+
+.segment-builder-footer {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #eaecf0;
+}
+
+.segment-builder-footer > span {
+  max-width: 360px;
+}
+
+.segment-results {
+  min-height: 220px;
+}
+
+.segment-result-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 20px;
+  padding: 8px 12px;
+  background: #f4ebff;
+  color: #6941c6;
+  font-weight: 700;
+}
+
+.results-empty {
+  padding: 34px 16px;
+}
+
+.segments-customers-table {
+  width: 100%;
+  margin-top: 20px;
+  border-collapse: collapse;
+}
+
+.segments-customers-table th,
+.segments-customers-table td {
+  padding: 13px 14px;
+  border-bottom: 1px solid #eaecf0;
+  text-align: left;
+}
+
+.segments-customers-table th {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.segments-customers-table td {
+  color: #475467;
+  font-size: 14px;
+}
+
+.segments-customers-table td:first-child strong,
+.segments-customers-table td:first-child span {
+  display: block;
+}
+
+.segments-customers-table td:first-child strong {
+  color: #344054;
+}
+
+.segments-customers-table td:first-child span {
+  margin-top: 3px;
+  color: #98a2b3;
+  font-size: 12px;
+}
+
+.segment-customer-card {
+  border-left: 3px solid #9e77ed;
+}
+
+.customer-profile-label {
+  display: block;
+  margin-bottom: 5px;
+  color: #7f56d9;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.segment-profile-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+  margin-top: 22px;
+  color: #475467;
+  font-size: 14px;
+}
+
+.segment-profile-stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.segment-profile-stats svg {
+  color: #7f56d9;
+}
+
+@media (max-width: 960px) {
+  .segments-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .segments-saved-list,
+  .segment-builder,
+  .segment-results,
+  .segment-customer-card {
+    padding: 18px;
+  }
+
+  .segment-condition {
+    flex-wrap: wrap;
+  }
+
+  .segment-condition select,
+  .segment-condition input,
+  .condition-operator {
+    flex: 1 1 calc(50% - 30px);
+  }
+
+  .segment-builder-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
