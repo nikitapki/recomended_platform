@@ -332,8 +332,12 @@ function validateImportRows(rows, mapping, tenantId) {
     totalCount: results.length,
 
     validCount: results.filter(
-      (row) => row.status !== 'error'
-    ).length,
+  (row) => row.status === 'valid'
+  ).length,
+
+  importableCount: results.filter(
+    (row) => row.status !== 'error'
+  ).length,
 
     warningCount: results.filter(
       (row) => row.status === 'warning'
@@ -345,7 +349,15 @@ function validateImportRows(rows, mapping, tenantId) {
   };
 }
 
+const IMPORT_HISTORY_STORAGE_KEY = 'mall-insight-import-history';
 
+const SOURCE_SYSTEM_LABELS = {
+  crm: 'CRM',
+  loyalty: 'Программа лояльности',
+  pos: 'POS',
+  pms: 'PMS',
+  other: 'Другая система'
+};
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 function formatFileSize(bytes) {
@@ -379,7 +391,19 @@ function Imports() {
   const [warning, setWarning] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [isReading, setIsReading] = useState(false);
+  // Результат подтверждения импорта
+const [importResult, setImportResult] = useState(null); 
+  const [importHistory, setImportHistory] = useState(() => {
+  try {
+    const saved = localStorage.getItem(
+      IMPORT_HISTORY_STORAGE_KEY
+    );
 
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+});
   // Обработка выбранного файла
   const handleFile = async (selectedFile) => {
     if (!selectedFile) return;
@@ -388,8 +412,12 @@ function Imports() {
     setWarning('');
     setPreview([]);
     setColumns([]);
+    setParsedRows([]);
+    setFieldMapping({});
     setTotalRows(0);
     setFile(null);
+    setImportResult(null);
+
 
     const extension = selectedFile.name
       .split('.')
@@ -510,6 +538,7 @@ function Imports() {
     setTotalRows(0);
     setError('');
     setWarning('');
+    setImportResult(null);
 
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -554,6 +583,57 @@ const displayedValidationRows = validationReport.rows
       row.status === 'warning'
   )
   .slice(0, 10);
+  // Проверяем возможность подтверждения импорта
+const canConfirmImport =
+  transferMethod === 'file' &&
+  Boolean(file) &&
+  Boolean(tenantId) &&
+  parsedRows.length > 0 &&
+  validationReport.mappingIssues.length === 0 &&
+  validationReport.importableCount > 0;
+
+
+const handleConfirmImport = () => {
+  if (!canConfirmImport) return;
+
+  const result = {
+    id: crypto.randomUUID(),
+
+    fileName: file.name,
+    tenantName: selectedTenant?.name || 'Неизвестный арендатор',
+
+    sourceSystem,
+    transferMethod,
+
+    totalRows: validationReport.totalCount,
+    cleanRows: validationReport.validCount,
+    importableRows: validationReport.importableCount,
+    warningRows: validationReport.warningCount,
+    rejectedRows: validationReport.errorCount,
+
+    confirmedAt: new Date().toLocaleString('ru-RU'),
+
+    status: 'Подготовлено локально'
+  };
+
+  setImportResult(result);
+
+  setImportHistory((previous) => {
+    const updated = [result, ...previous];
+
+    try {
+      localStorage.setItem(
+        IMPORT_HISTORY_STORAGE_KEY,
+        JSON.stringify(updated)
+      );
+    } catch (error) {
+      console.error('Не удалось сохранить историю:', error);
+    }
+
+    return updated;
+  });
+};
+
 
   return (
     <div className="imports-page">
@@ -593,59 +673,119 @@ const displayedValidationRows = validationReport.rows
             </div>
           </div>
 
-          <div className="import-fields">
+          
+              <div className="import-fields"></div>
+              <div className="import-field">
+                <label htmlFor="tenant">
+                  Арендатор
+                </label>
 
-            <div className="import-field">
-              <label htmlFor="tenant">
-                Арендатор
-              </label>
-
-              <select
-                id="tenant"
-                value={tenantId}
-                onChange={(e) => setTenantId(e.target.value)}
-              >
-                <option value="">
-                  Выберите арендатора
-                </option>
-
-                {TENANTS.map((tenant) => (
-                  <option
-                    key={tenant.id}
-                    value={tenant.id}
-                  >
-                    {tenant.name}
+                <select
+                  id="tenant"
+                  value={tenantId}
+                  onChange={(e) => {
+                  setTenantId(e.target.value);
+                  setImportResult(null);
+                }}
+                >
+                  <option value="">
+                    Выберите арендатора
                   </option>
-                ))}
-              </select>
-            </div>
 
-            <div className="import-field">
-              <label htmlFor="sourceType">
-                Тип источника
-              </label>
+                  {TENANTS.map((tenant) => (
+                    <option
+                      key={tenant.id}
+                      value={tenant.id}
+                    >
+                      {tenant.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-              <select
-                id="sourceType"
-                value={sourceType}
-                onChange={(e) => setSourceType(e.target.value)}
-              >
-                <option value="crm">
-                  CRM / Программа лояльности
-                </option>
+              
+  <div className="import-field">
+    <label htmlFor="sourceSystem">
+      Система-источник
+    </label>
 
-                <option value="pos">
-                  POS / Кассовая система
-                </option>
+    <select
+      id="sourceSystem"
+      value={sourceSystem}
+      onChange={(e) => setSourceSystem(e.target.value)}
+    >
+      <option value="crm">CRM-система</option>
+      <option value="loyalty">Программа лояльности</option>
+      <option value="pos">POS / Кассовая система</option>
+      <option value="pms">PMS / Система бронирования</option>
+      <option value="other">Другая система</option>
+    </select>
+  </div>
+  
 
-                <option value="other">
-                  Другая система
-                </option>
-              </select>
-            </div>
 
-          </div>
+{/* СПОСОБ ПЕРЕДАЧИ ДАННЫХ */}
 
+<div className="transfer-method-section">
+
+  <label className="transfer-method-label">
+    Способ передачи данных
+  </label>
+
+  <div className="transfer-method-options">
+
+    <button
+      type="button"
+      className={`transfer-method-option ${
+        transferMethod === 'file' ? 'active' : ''
+      }`}
+      onClick={() => {
+        clearFile();
+        setTransferMethod('file');
+      }}
+    >
+      <div className="transfer-method-icon">
+        <FileSpreadsheet size={23} />
+      </div>
+
+      <div>
+        <strong>Загрузка файла</strong>
+        <span>CSV, Excel</span>
+      </div>
+
+      <span className="method-badge">MVP</span>
+    </button>
+
+    <button
+      type="button"
+      className={`transfer-method-option ${
+        transferMethod === 'api' ? 'active' : ''
+      }`}
+      onClick={() => {
+        clearFile();
+        setTransferMethod('api');
+      }}
+    >
+      <div className="transfer-method-icon">
+        <Database size={23} />
+      </div>
+
+      <div>
+        <strong>Интеграция API</strong>
+        <span>Автоматическая передача</span>
+      </div>
+
+      <span className="method-badge planned">
+        API
+      </span>
+    </button>
+
+  </div>
+</div>
+
+
+      {transferMethod === 'file' ? (
+  <>    
           {/* Область загрузки */}
 
           <div
@@ -755,21 +895,91 @@ const displayedValidationRows = validationReport.rows
 
             </div>
           )}
+            </>
+) : (
+  <div className="api-connection-panel">
 
+    <div className="api-panel-heading">
+      <div className="api-panel-icon">
+        <Database size={23} />
+      </div>
+
+      <div>
+        <h3>Приём данных через API</h3>
+        <p>
+          Автоматическая передача событий из системы арендатора.
+        </p>
+      </div>
+    </div>
+
+    <div className="api-info-message">
+      <AlertCircle size={18} />
+      <span>
+        Параметры подключения будут выдаваться
+        Backend после настройки интеграции.
+        Сейчас доступен просмотр контракта API.
+      </span>
+    </div>
+
+    <div className="api-detail">
+      <label>Адрес приёма данных</label>
+
+      <div className="api-endpoint">
+        <span className="http-method">POST</span>
+        <code>/api/integrations/events</code>
+      </div>
+    </div>
+
+    <div className="api-detail">
+      <label>Авторизация</label>
+      <div className="api-endpoint">
+        <code>Authorization: Bearer API_KEY</code>
+      </div>
+    </div>
+
+    <div className="api-detail">
+      <label>Формат данных (JSON)</label>
+
+      <pre className="api-code">{`{
+  "externalEventId": "POS-100245",
+  "customer": {
+    "fullName": "Иван Петров",
+    "phone": "+79001112233",
+    "email": "ivan@mail.ru"
+  },
+  "event": {
+    "type": "purchase",
+    "occurredAt": "2026-10-31T12:30:00+03:00",
+    "amount": 2500,
+    "currency": "RUB"
+  }
+}`}</pre>
+    </div>
+
+    <div className="api-bottom-note">
+      <CheckCircle2 size={17} />
+      <span>
+        Поддерживается передача информации о гостях,
+        покупках, посещениях и бронированиях.
+      </span>
+    </div>
+
+  </div>
+)}
           {/* Выбранный арендатор */}
 
-          {selectedTenant && (
-            <div className="selected-tenant">
-              Выбран арендатор:
-              <strong>{selectedTenant.name}</strong>
-            </div>
-          )}
+{selectedTenant && (
+  <div className="selected-tenant">
+    Выбран арендатор:
+    <strong>{selectedTenant.name}</strong>
+  </div>
+)}
 
-        </section>
+</section>
 
-        {/* Информация справа */}
+{/* Информация справа */}
 
-        <aside className="content-card import-info">
+<aside className="content-card import-info">
 
           <h2>Как работает загрузка?</h2>
 
@@ -943,11 +1153,13 @@ const displayedValidationRows = validationReport.rows
             <select
               value={selectedColumn || ''}
               onChange={(event) => {
-                setFieldMapping((previous) => ({
-                  ...previous,
-                  [field.key]: event.target.value
-                }));
-              }}
+              setFieldMapping((previous) => ({
+                ...previous,
+                [field.key]: event.target.value
+              }));
+
+              setImportResult(null);
+            }}
             >
 
               <option value="">
@@ -1180,9 +1392,222 @@ const displayedValidationRows = validationReport.rows
         Окончательная валидация будет выполняться Backend.
       </span>
     </div>
+      
+{/* ПОДТВЕРЖДЕНИЕ ИМПОРТА */}
+
+<div className="import-confirm-section">
+
+  <div className="import-confirm-info">
+    <strong>Готовы завершить проверку?</strong>
+
+    <p>
+      Корректные записи будут подготовлены к импорту.
+      Записи с критическими ошибками останутся отклонёнными.
+    </p>
+  </div>
+
+  <button
+  type="button"
+  className="confirm-import-button"
+  disabled={!canConfirmImport}
+  onClick={handleConfirmImport}
+>
+  <CheckCircle2 size={18} />
+  Подтвердить импорт
+</button>
+
+</div>
+
+{!canConfirmImport && (
+  <div className="confirm-hint">
+    Для подтверждения выберите арендатора, загрузите файл,
+    сопоставьте обязательные поля и проверьте данные.
+    Необходимо иметь хотя бы одну корректную запись.
+  </div>
+)}
+
+{/* РЕЗУЛЬТАТ ПОДТВЕРЖДЕНИЯ */}
+
+{importResult && (
+  <div className="import-result">
+
+    <div className="import-result-heading">
+      <CheckCircle2 size={24} />
+
+      <div>
+        <h3>Проверка и подтверждение завершены</h3>
+        <p>
+          Результат подготовлен локально, без сохранения в БД.
+        </p>
+      </div>
+    </div>
+
+    <div className="import-result-details">
+      <div>
+        <span>Файл</span>
+        <strong>{importResult.fileName}</strong>
+      </div>
+
+      <div>
+        <span>Арендатор</span>
+        <strong>{importResult.tenantName}</strong>
+      </div>
+
+      <div>
+        <span>Дата подтверждения</span>
+        <strong>{importResult.confirmedAt}</strong>
+      </div>
+    </div>
+
+    
+<div className="import-result-stats">
+
+  <div className="result-stat">
+    <span>Всего записей</span>
+    <strong>{importResult.totalRows}</strong>
+  </div>
+
+  <div className="result-stat accepted">
+    <span>Без замечаний</span>
+    <strong>{importResult.cleanRows}</strong>
+  </div>
+
+  <div className="result-stat warning">
+    <span>С предупреждениями</span>
+    <strong>{importResult.warningRows}</strong>
+  </div>
+
+  <div className="result-stat rejected">
+    <span>Отклонено</span>
+    <strong>{importResult.rejectedRows}</strong>
+  </div>
+
+</div>
+
+<div className="importable-summary">
+  К импорту допущено: <strong>{importResult.importableRows}</strong>
+  {' '}записей, включая записи с предупреждениями.
+</div>
+
+
+    <div className="import-result-note">
+      <AlertCircle size={17} />
+
+      <span>
+        Это демонстрационный результат. Данные ещё не отправлены
+        на Backend и не сохранены в PostgreSQL.
+        Реальный импорт подключим после настройки API.
+      </span>
+    </div>
+
+  </div>
+)}
 
   </section>
 )}
+  
+{/* ИСТОРИЯ ЗАГРУЗОК */}
+
+<section className="content-card import-history">
+
+  <div className="import-section-heading">
+
+    <div>
+      <h2>История загрузок</h2>
+      <p>
+        Все подтверждённые загрузки в текущем браузере.
+      </p>
+    </div>
+
+    <span className="history-counter">
+      {importHistory.length} загрузок
+    </span>
+
+  </div>
+
+  {importHistory.length === 0 ? (
+
+    <div className="history-empty">
+      <FileSpreadsheet size={30} />
+
+      <strong>История пока пуста</strong>
+
+      <span>
+        После подтверждения загрузки она появится здесь.
+      </span>
+    </div>
+
+  ) : (
+
+    <div className="table-wrapper">
+
+      <table className="history-table">
+
+        <thead>
+          <tr>
+            <th>Файл</th>
+            <th>Арендатор</th>
+            <th>Источник</th>
+            <th>Дата</th>
+            <th>Записей</th>
+            <th>Отклонено</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {importHistory.map((item) => (
+            <tr key={item.id}>
+
+              <td className="file-name">
+                <FileText size={16} />
+                {item.fileName}
+              </td>
+
+              <td>{item.tenantName}</td>
+
+              <td>
+                {SOURCE_SYSTEM_LABELS[item.sourceSystem] || item.sourceSystem}
+              </td>
+
+              <td>{item.confirmedAt}</td>
+
+              <td>{item.totalRows}</td>
+
+              <td>
+                <span className={
+                  item.rejectedRows > 0
+                    ? 'history-error-count'
+                    : 'history-success-count'
+                }>
+                  {item.rejectedRows}
+                </span>
+              </td>
+
+              <td>
+                <span className="status success">
+                  Демо
+                </span>
+              </td>
+
+            </tr>
+          ))}
+        </tbody>
+
+      </table>
+
+    </div>
+
+  )}
+
+  <div className="history-note">
+    <Database size={16} />
+    История хранится локально в браузере.
+    После подключения Backend будет использоваться PostgreSQL.
+  </div>
+
+</section>
+
 
     </div>
   );
