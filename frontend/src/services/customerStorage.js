@@ -1,5 +1,6 @@
 
-const STORAGE_KEY = 'mall-insight-imported-events';
+export const IMPORTED_EVENTS_STORAGE_KEY = 'mall-insight-imported-events';
+export const CUSTOMERS_UPDATED_EVENT = 'mall-insight:customers-updated';
 
 // Нормализация телефона
 function normalizePhone(value) {
@@ -14,7 +15,7 @@ function normalizeEmail(value) {
 // Получение импортированных событий
 export function getImportedEvents() {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = localStorage.getItem(IMPORTED_EVENTS_STORAGE_KEY);
 
     if (!saved) return [];
 
@@ -117,9 +118,11 @@ export function saveImportedEvents({
   ];
 
   localStorage.setItem(
-    STORAGE_KEY,
+    IMPORTED_EVENTS_STORAGE_KEY,
     JSON.stringify(updatedEvents)
   );
+
+  window.dispatchEvent(new CustomEvent(CUSTOMERS_UPDATED_EVENT));
 
   return newEvents.length;
 }

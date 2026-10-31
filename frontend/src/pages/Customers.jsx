@@ -1,6 +1,16 @@
 
-import { useMemo, useState } from 'react';
-import { getImportedEvents } from '../services/customerStorage.js';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import {
+  CUSTOMERS_UPDATED_EVENT,
+  getImportedEvents,
+  IMPORTED_EVENTS_STORAGE_KEY
+} from '../services/customerStorage.js';
+import {
+  getSettings,
+  SETTINGS_STORAGE_KEY,
+  SETTINGS_UPDATED_EVENT
+} from '../services/settingsService.js';
 import {
   Users,
   Search,
@@ -11,196 +21,10 @@ import {
   Phone,
   Calendar,
   ShoppingBag,
-  X,
-  UserRound,
-  ArrowLeft
+  X
 } from 'lucide-react';
 
 import './Customers.css';
-
-// Демонстрационные данные гостей
-const MOCK_CUSTOMERS = [
-  {
-    id: 1,
-    fullName: 'Иван Петров',
-    phone: '+79001112233',
-    email: 'ivan@mail.ru',
-    eventsCount: 8,
-    totalSpent: 10800,
-    lastActivity: '31.10.2026',
-    tenants: ['Coffee House', 'Fashion Store'],
-    events: [
-      {
-        tenant: 'Coffee House',
-        type: 'Покупка',
-        date: '31.10.2026',
-        amount: 2500
-      },
-      {
-        tenant: 'Fashion Store',
-        type: 'Покупка',
-        date: '27.10.2026',
-        amount: 8300
-      }
-    ]
-  },
-  {
-    id: 2,
-    fullName: 'Анна Смирнова',
-    phone: '+79002223344',
-    email: 'anna@mail.ru',
-    eventsCount: 5,
-    totalSpent: 4200,
-    lastActivity: '29.10.2026',
-    tenants: ['Coffee House'],
-    events: [
-      {
-        tenant: 'Coffee House',
-        type: 'Посещение',
-        date: '29.10.2026',
-        amount: 0
-      },
-      {
-        tenant: 'Coffee House',
-        type: 'Покупка',
-        date: '24.10.2026',
-        amount: 4200
-      }
-    ]
-  },
-  {
-    id: 3,
-    fullName: 'Петр Иванов',
-    phone: '+79003334455',
-    email: 'petr@mail.ru',
-    eventsCount: 12,
-    totalSpent: 15400,
-    lastActivity: '30.10.2026',
-    tenants: ['Fashion Store', 'Sport Shop'],
-    events: [
-      {
-        tenant: 'Sport Shop',
-        type: 'Покупка',
-        date: '30.10.2026',
-        amount: 5400
-      },
-      {
-        tenant: 'Fashion Store',
-        type: 'Покупка',
-        date: '25.10.2026',
-        amount: 10000
-      }
-    ]
-  },
-  {
-    id: 4,
-    fullName: 'Мария Соколова',
-    phone: '+79004445566',
-    email: 'maria@mail.ru',
-    eventsCount: 4,
-    totalSpent: 1500,
-    lastActivity: '28.10.2026',
-    tenants: ['Food Corner'],
-    events: [
-      {
-        tenant: 'Food Corner',
-        type: 'Бронирование',
-        date: '28.10.2026',
-        amount: 1500
-      }
-    ]
-  },
-  {
-    id: 5,
-    fullName: 'Дмитрий Орлов',
-    phone: '+79005556677',
-    email: 'dmitry@mail.ru',
-    eventsCount: 7,
-    totalSpent: 7600,
-    lastActivity: '26.10.2026',
-    tenants: ['Sport Shop', 'Coffee House'],
-    events: [
-      {
-        tenant: 'Sport Shop',
-        type: 'Покупка',
-        date: '26.10.2026',
-        amount: 5600
-      },
-      {
-        tenant: 'Coffee House',
-        type: 'Покупка',
-        date: '22.10.2026',
-        amount: 2000
-      }
-    ]
-  },
-  {
-    id: 6,
-    fullName: 'Елена Козлова',
-    phone: '+79006667788',
-    email: 'elena@mail.ru',
-    eventsCount: 6,
-    totalSpent: 6800,
-    lastActivity: '25.10.2026',
-    tenants: ['Beauty Studio', 'Coffee House'],
-    events: [
-      {
-        tenant: 'Beauty Studio',
-        type: 'Покупка',
-        date: '25.10.2026',
-        amount: 4800
-      },
-      {
-        tenant: 'Coffee House',
-        type: 'Посещение',
-        date: '21.10.2026',
-        amount: 0
-      }
-    ]
-  },
-  {
-    id: 7,
-    fullName: 'Александр Волков',
-    phone: '+79007778899',
-    email: 'alex@mail.ru',
-    eventsCount: 9,
-    totalSpent: 12300,
-    lastActivity: '24.10.2026',
-    tenants: ['Fashion Store', 'Food Corner'],
-    events: [
-      {
-        tenant: 'Fashion Store',
-        type: 'Покупка',
-        date: '24.10.2026',
-        amount: 9300
-      },
-      {
-        tenant: 'Food Corner',
-        type: 'Покупка',
-        date: '20.10.2026',
-        amount: 3000
-      }
-    ]
-  },
-  {
-    id: 8,
-    fullName: 'Ольга Морозова',
-    phone: '+79008889900',
-    email: 'olga@mail.ru',
-    eventsCount: 3,
-    totalSpent: 2100,
-    lastActivity: '23.10.2026',
-    tenants: ['Food Corner'],
-    events: [
-      {
-        tenant: 'Food Corner',
-        type: 'Покупка',
-        date: '23.10.2026',
-        amount: 2100
-      }
-    ]
-  }
-];
 
 // Нормализация идентификаторов
 function normalizeCustomerPhone(value) {
@@ -256,7 +80,7 @@ function getEventLabel(type) {
   return labels[type] || type || 'Событие';
 }
 
-// Объединение демонстрационных профилей с импортированными событиями
+// Построение профилей только по фактически импортированным событиям
 function mergeImportedEventsWithCustomers(
   baseCustomers,
   importedEvents
@@ -383,32 +207,80 @@ function mergeImportedEventsWithCustomers(
   return customers;
 }
 
-const TENANT_OPTIONS = [
-  'Coffee House',
-  'Fashion Store',
-  'Food Corner',
-  'Sport Shop',
-  'Beauty Studio'
-];
-
 function formatMoney(value) {
   return `${value.toLocaleString('ru-RU')} ₽`;
 }
 
-function Customers() {
-
-  // Объединяем демонстрационных гостей
-  // с событиями из загруженных файлов
-  const [customers] = useState(() =>
-    mergeImportedEventsWithCustomers(
-      MOCK_CUSTOMERS,
-      getImportedEvents()
-    )
+export function getCustomerProfiles() {
+  return mergeImportedEventsWithCustomers(
+    [],
+    getImportedEvents()
   );
+}
+
+function Customers() {
+  const [searchParams] = useSearchParams();
+
+  const [customers, setCustomers] = useState(getCustomerProfiles);
 
   const [search, setSearch] = useState('');
   const [tenantFilter, setTenantFilter] = useState('all');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [tenantOptions, setTenantOptions] = useState(
+    () => getSettings().tenants
+  );
+
+  useEffect(() => {
+    const refreshCustomers = () => {
+      const updatedCustomers = getCustomerProfiles();
+
+      setCustomers(updatedCustomers);
+      setSelectedCustomer((currentCustomer) => {
+        if (!currentCustomer) return null;
+
+        return updatedCustomers.find(
+          (customer) => customer.id === currentCustomer.id
+        ) || null;
+      });
+    };
+
+    const handleStorage = (event) => {
+      if (event.key === IMPORTED_EVENTS_STORAGE_KEY) {
+        refreshCustomers();
+      }
+      if (event.key === SETTINGS_STORAGE_KEY) {
+        setTenantOptions(getSettings().tenants);
+      }
+    };
+    const refreshTenantOptions = () => setTenantOptions(getSettings().tenants);
+
+    window.addEventListener(CUSTOMERS_UPDATED_EVENT, refreshCustomers);
+    window.addEventListener(SETTINGS_UPDATED_EVENT, refreshTenantOptions);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener(
+        CUSTOMERS_UPDATED_EVENT,
+        refreshCustomers
+      );
+      window.removeEventListener(SETTINGS_UPDATED_EVENT, refreshTenantOptions);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    const customerId = searchParams.get('customer');
+    if (!customerId) return;
+
+    const customer = customers.find(
+      (item) => String(item.id) === customerId
+    );
+
+    if (!customer) return undefined;
+
+    const frame = requestAnimationFrame(() => setSelectedCustomer(customer));
+    return () => cancelAnimationFrame(frame);
+  }, [customers, searchParams]);
 
   // Фильтрация гостей
   const filteredCustomers = useMemo(() => {
@@ -455,11 +327,6 @@ function Customers() {
         </div>
       </div>
 
-      <div className="customers-demo-notice">
-        Демонстрационные данные. Реальные профили будут
-        загружаться из PostgreSQL через Backend API.
-      </div>
-
       {/* Статистика */}
 
       <div className="customer-stats">
@@ -500,7 +367,7 @@ function Customers() {
           </div>
 
           <span>Арендаторы</span>
-          <strong>{TENANT_OPTIONS.length}</strong>
+            <strong>{tenantOptions.length}</strong>
           <small>Представлены в данных</small>
         </div>
 
@@ -554,9 +421,9 @@ function Customers() {
           >
             <option value="all">Все арендаторы</option>
 
-            {TENANT_OPTIONS.map((tenant) => (
-              <option key={tenant} value={tenant}>
-                {tenant}
+            {tenantOptions.map((tenant) => (
+              <option key={tenant.id} value={tenant.name}>
+                {tenant.name}{tenant.active ? '' : ' (неактивен)'}
               </option>
             ))}
           </select>

@@ -1,8 +1,23 @@
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { saveImportedEvents } from '../services/customerStorage.js';
+import {
+  clearImportHistory,
+  getImportHistory,
+  IMPORT_HISTORY_STORAGE_KEY,
+  IMPORTS_UPDATED_EVENT,
+  saveImportHistoryItem
+} from '../services/importHistoryService.js';
+import {
+  getActiveSources,
+  getActiveTenants,
+  getSourceName,
+  SETTINGS_STORAGE_KEY,
+  SETTINGS_UPDATED_EVENT
+} from '../services/settingsService.js';
 import {
   UploadCloud,
   FileSpreadsheet,
@@ -15,14 +30,6 @@ import {
 } from 'lucide-react';
 
 import './Imports.css';
-
-const TENANTS = [
-  { id: 1, name: 'Coffee House' },
-  { id: 2, name: 'Fashion Store' },
-  { id: 3, name: 'Food Corner' },
-  { id: 4, name: 'Sport Shop' },
-  { id: 5, name: 'Beauty Studio' }
-];
 
 // Поля единой структуры платформы
 const TARGET_FIELDS = [
@@ -349,15 +356,6 @@ function validateImportRows(rows, mapping, tenantId) {
   };
 }
 
-const IMPORT_HISTORY_STORAGE_KEY = 'mall-insight-import-history';
-
-const SOURCE_SYSTEM_LABELS = {
-  crm: 'CRM',
-  loyalty: 'Программа лояльности',
-  pos: 'POS',
-  pms: 'PMS',
-  other: 'Другая система'
-};
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 function formatFileSize(bytes) {
@@ -370,12 +368,17 @@ function formatFileSize(bytes) {
 }
 
 function Imports() {
+  const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  const [tenants, setTenants] = useState(getActiveTenants);
+  const [sources, setSources] = useState(getActiveSources);
 
   const [tenantId, setTenantId] = useState('');
 
   // Система, из которой поступают данные
-  const [sourceSystem, setSourceSystem] = useState('crm');
+  const [sourceSystem, setSourceSystem] = useState(
+    () => getActiveSources()[0]?.id || ''
+  );
 
   // Способ передачи данных
   const [transferMethod, setTransferMethod] = useState('file');
@@ -393,17 +396,46 @@ function Imports() {
   const [isReading, setIsReading] = useState(false);
   // Результат подтверждения импорта
 const [importResult, setImportResult] = useState(null); 
-  const [importHistory, setImportHistory] = useState(() => {
-  try {
-    const saved = localStorage.getItem(
-      IMPORT_HISTORY_STORAGE_KEY
-    );
+  const [importHistory, setImportHistory] = useState(getImportHistory);
 
-    return saved ? JSON.parse(saved) : [];
-  } catch {
-    return [];
-  }
-});
+  useEffect(() => {
+    const refreshReferences = () => {
+      const nextTenants = getActiveTenants();
+      const nextSources = getActiveSources();
+
+      setTenants(nextTenants);
+      setSources(nextSources);
+      setTenantId((currentId) => nextTenants.some(
+        (tenant) => String(tenant.id) === String(currentId)
+      ) ? currentId : '');
+      setSourceSystem((currentId) => nextSources.some(
+        (source) => source.id === currentId
+      ) ? currentId : (nextSources[0]?.id || ''));
+    };
+    const handleStorage = (event) => {
+      if (event.key === SETTINGS_STORAGE_KEY) refreshReferences();
+      if (event.key === IMPORT_HISTORY_STORAGE_KEY) setImportHistory(getImportHistory());
+    };
+    const refreshHistory = () => setImportHistory(getImportHistory());
+
+    window.addEventListener(SETTINGS_UPDATED_EVENT, refreshReferences);
+    window.addEventListener(IMPORTS_UPDATED_EVENT, refreshHistory);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener(SETTINGS_UPDATED_EVENT, refreshReferences);
+      window.removeEventListener(IMPORTS_UPDATED_EVENT, refreshHistory);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
+  const handleClearImportHistory = () => {
+    if (!window.confirm('Очистить только историю загрузок? Профили гостей, события, сегменты, рекомендации и история экспорта останутся без изменений.')) {
+      return;
+    }
+
+    clearImportHistory();
+    setImportHistory([]);
+  };
   // Обработка выбранного файла
   const handleFile = async (selectedFile) => {
     if (!selectedFile) return;
@@ -557,8 +589,8 @@ const [importResult, setImportResult] = useState(null);
     handleFile(droppedFile);
   };
 
-  const selectedTenant = TENANTS.find(
-    (tenant) => tenant.id === Number(tenantId)
+  const selectedTenant = tenants.find(
+    (tenant) => String(tenant.id) === String(tenantId)
   );
   const hasContactField = Boolean(
   fieldMapping.phone || fieldMapping.email
@@ -587,7 +619,7 @@ const displayedValidationRows = validationReport.rows
 const canConfirmImport =
   transferMethod === 'file' &&
   Boolean(file) &&
-  Boolean(tenantId) &&
+  Boolean(selectedTenant) &&
   parsedRows.length > 0 &&
   validationReport.mappingIssues.length === 0 &&
   validationReport.importableCount > 0;
@@ -627,22 +659,14 @@ const handleConfirmImport = () => {
       importedEventsCount,
 
       confirmedAt: new Date().toLocaleString('ru-RU'),
+      confirmedAtIso: new Date().toISOString(),
 
       status: 'Подготовлено локально'
     };
 
     setImportResult(result);
 
-    setImportHistory((previous) => {
-      const updated = [result, ...previous];
-
-      localStorage.setItem(
-        IMPORT_HISTORY_STORAGE_KEY,
-        JSON.stringify(updated)
-      );
-
-      return updated;
-    });
+    setImportHistory(saveImportHistoryItem(result));
 
   } catch (error) {
     console.error('Ошибка сохранения импорта:', error);
@@ -712,7 +736,7 @@ const handleConfirmImport = () => {
                     Выберите арендатора
                   </option>
 
-                  {TENANTS.map((tenant) => (
+                  {tenants.map((tenant) => (
                     <option
                       key={tenant.id}
                       value={tenant.id}
@@ -734,11 +758,9 @@ const handleConfirmImport = () => {
       value={sourceSystem}
       onChange={(e) => setSourceSystem(e.target.value)}
     >
-      <option value="crm">CRM-система</option>
-      <option value="loyalty">Программа лояльности</option>
-      <option value="pos">POS / Кассовая система</option>
-      <option value="pms">PMS / Система бронирования</option>
-      <option value="other">Другая система</option>
+        {sources.map((source) => (
+          <option key={source.id} value={source.id}>{source.name}</option>
+        ))}
     </select>
   </div>
   
@@ -1505,8 +1527,8 @@ const handleConfirmImport = () => {
 </div>
 
 <div className="importable-summary">
-  К импорту допущено: <strong>{importResult.importableRows}</strong>
-  {' '}записей, включая записи с предупреждениями.
+  В реестр гостей добавлено событий: <strong>{importResult.importedEventsCount}</strong>
+  {' '}из {importResult.importableRows} допущенных к импорту записей.
 </div>
 
 
@@ -1514,11 +1536,18 @@ const handleConfirmImport = () => {
       <AlertCircle size={17} />
 
       <span>
-        Это демонстрационный результат. Данные ещё не отправлены
-        на Backend и не сохранены в PostgreSQL.
-        Реальный импорт подключим после настройки API.
+        События сохранены в текущем браузере и уже доступны в реестре гостей.
+        В PostgreSQL они пока не отправляются.
       </span>
     </div>
+
+    <button
+      type="button"
+      className="primary-button"
+      onClick={() => navigate('/customers')}
+    >
+      Открыть реестр гостей
+    </button>
 
   </div>
 )}
@@ -1528,7 +1557,7 @@ const handleConfirmImport = () => {
   
 {/* ИСТОРИЯ ЗАГРУЗОК */}
 
-<section className="content-card import-history">
+<section className="content-card import-history" id="import-history">
 
   <div className="import-section-heading">
 
@@ -1539,9 +1568,14 @@ const handleConfirmImport = () => {
       </p>
     </div>
 
-    <span className="history-counter">
-      {importHistory.length} загрузок
-    </span>
+    <div className="history-actions">
+      <span className="history-counter">{importHistory.length} загрузок</span>
+      {importHistory.length > 0 && (
+        <button type="button" className="text-button" onClick={handleClearImportHistory}>
+          Очистить историю
+        </button>
+      )}
+    </div>
 
   </div>
 
@@ -1587,7 +1621,7 @@ const handleConfirmImport = () => {
               <td>{item.tenantName}</td>
 
               <td>
-                {SOURCE_SYSTEM_LABELS[item.sourceSystem] || item.sourceSystem}
+                {getSourceName(item.sourceSystem)}
               </td>
 
               <td>{item.confirmedAt}</td>

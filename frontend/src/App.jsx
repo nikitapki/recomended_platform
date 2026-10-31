@@ -4,11 +4,14 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 
 import Dashboard from './pages/Dashboard';
-import PlaceholderPage from './pages/PlaceholderPage';
+import Segments from './pages/Segments';
+import Recommendations from './pages/Recommendations';
+import Exports from './pages/Exports';
 
 import './App.css';
 import Imports from './pages/Imports';
 import Customers from './pages/Customers';
+import Settings from './pages/Settings';
 function App() {
   return (
     <Routes>
@@ -27,33 +30,20 @@ function App() {
 
         <Route
           path="/segments"
-          element={
-            <PlaceholderPage
-              title="Сегменты"
-              description="Создание и управление сегментами гостей."
-            />
-          }
+          element={<Segments />}
         />
 
         <Route
           path="/recommendations"
-          element={
-            <PlaceholderPage
-              title="Рекомендации"
-              description="Персональные рекомендации для гостей торгового центра."
-            />
-          }
+          element={<Recommendations />}
         />
 
         <Route
           path="/exports"
-          element={
-            <PlaceholderPage
-              title="Экспорт"
-              description="Подготовка аудиторий для маркетинговых рассылок."
-            />
-          }
+          element={<Exports />}
         />
+
+        <Route path="/settings" element={<Settings />} />
 
         <Route
           path="*"
