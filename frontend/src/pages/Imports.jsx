@@ -1,5 +1,5 @@
 
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 
@@ -110,6 +110,242 @@ function buildDefaultMapping(headers) {
   );
 }
 
+// Допустимые значения типа события
+const EVENT_TYPE_ALIASES = {
+  visit: ['visit', 'visits', 'посещение', 'визит'],
+  purchase: ['purchase', 'покупка', 'покупки'],
+  booking: ['booking', 'reservation', 'бронирование', 'бронь']
+};
+
+// Получение значения из строки по сопоставленному столбцу
+function getMappedValue(row, mapping, field) {
+  const column = mapping[field];
+
+  if (!column) return '';
+
+  return String(row[column] ?? '').trim();
+}
+
+// Проверка телефона
+function isValidPhone(value) {
+  const digits = String(value).replace(/\D/g, '');
+
+  return digits.length >= 10 && digits.length <= 15;
+}
+
+// Проверка email
+function isValidEmail(value) {
+  const email = String(value).trim();
+
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+// Приведение типа события к единому значению
+function normalizeEventType(value) {
+  const normalized = normalizeHeader(value);
+
+  for (const [canonicalType, aliases] of Object.entries(EVENT_TYPE_ALIASES)) {
+    const normalizedAliases = aliases.map(normalizeHeader);
+
+    if (normalizedAliases.includes(normalized)) {
+      return canonicalType;
+    }
+  }
+
+  return null;
+}
+
+// Проверка даты
+function isValidEventDate(value) {
+  const date = String(value).trim();
+
+  if (!date) return true;
+
+  // Формат ДД.ММ.ГГГГ
+  const russianDate = date.match(
+    /^(\d{2})\.(\d{2})\.(\d{4})$/
+  );
+
+  if (russianDate) {
+    const day = Number(russianDate[1]);
+    const month = Number(russianDate[2]);
+    const year = Number(russianDate[3]);
+
+    const parsed = new Date(year, month - 1, day);
+
+    return (
+      parsed.getFullYear() === year &&
+      parsed.getMonth() === month - 1 &&
+      parsed.getDate() === day
+    );
+  }
+
+  return !Number.isNaN(Date.parse(date));
+}
+
+// Основная проверка загруженных данных
+function validateImportRows(rows, mapping, tenantId) {
+  const mappingIssues = [];
+
+  // Проверяем наличие идентификатора гостя
+  if (!mapping.phone && !mapping.email) {
+    mappingIssues.push(
+      'Необходимо сопоставить телефон или email.'
+    );
+  }
+
+  // Тип события необходим для формирования истории гостя
+  if (!mapping.event_type) {
+    mappingIssues.push(
+      'Необходимо сопоставить тип события.'
+    );
+  }
+
+  if (!tenantId) {
+    mappingIssues.push(
+      'Необходимо выбрать арендатора.'
+    );
+  }
+
+  // Проверяем, что один столбец не назначен нескольким полям
+  const usedColumns = Object.entries(mapping)
+    .filter(([, column]) => column)
+    .reduce((acc, [field, column]) => {
+      acc[column] = [...(acc[column] || []), field];
+      return acc;
+    }, {});
+
+  Object.entries(usedColumns).forEach(([column, fields]) => {
+    if (fields.length > 1) {
+      mappingIssues.push(
+        `Столбец "${column}" назначен нескольким полям.`
+      );
+    }
+  });
+
+  // Проверяем каждую запись
+  const results = rows.map((row, index) => {
+    const errors = [];
+    const warnings = [];
+
+    const fullName = getMappedValue(row, mapping, 'full_name');
+    const phone = getMappedValue(row, mapping, 'phone');
+    const email = getMappedValue(row, mapping, 'email');
+
+    const eventType = getMappedValue(
+      row,
+      mapping,
+      'event_type'
+    );
+
+    const eventDate = getMappedValue(
+      row,
+      mapping,
+      'event_date'
+    );
+
+    const amount = getMappedValue(
+      row,
+      mapping,
+      'amount'
+    );
+
+    const validPhone = phone && isValidPhone(phone);
+    const validEmail = email && isValidEmail(email);
+
+    // Хотя бы один корректный идентификатор
+    if (!validPhone && !validEmail) {
+      errors.push(
+        'Не указан корректный телефон или email.'
+      );
+    } else {
+      if (phone && !validPhone) {
+        warnings.push('Некорректный телефон.');
+      }
+
+      if (email && !validEmail) {
+        warnings.push('Некорректный email.');
+      }
+    }
+
+    // Проверка типа события
+    if (mapping.event_type) {
+      if (!eventType) {
+        errors.push('Не указан тип события.');
+      } else if (!normalizeEventType(eventType)) {
+        errors.push(
+          `Неизвестный тип события: "${eventType}".`
+        );
+      }
+    }
+
+    // Проверка суммы
+    if (amount !== '') {
+      const normalizedAmount = Number(
+        amount.replace(',', '.')
+      );
+
+      if (
+        !Number.isFinite(normalizedAmount) ||
+        normalizedAmount < 0
+      ) {
+        errors.push('Некорректная сумма.');
+      }
+    }
+
+    // Проверка даты, если столбец сопоставлен
+    if (
+      mapping.event_date &&
+      eventDate &&
+      !isValidEventDate(eventDate)
+    ) {
+      errors.push('Некорректная дата события.');
+    }
+
+    // Имя необязательное, но отсутствие полезно отметить
+    if (mapping.full_name && !fullName) {
+      warnings.push('Не указано имя гостя.');
+    }
+
+    const status = errors.length > 0
+      ? 'error'
+      : warnings.length > 0
+        ? 'warning'
+        : 'valid';
+
+    return {
+      rowNumber: index + 2,
+      fullName,
+      phone,
+      email,
+      eventType,
+      status,
+      errors,
+      warnings
+    };
+  });
+
+  return {
+    mappingIssues,
+    rows: results,
+
+    totalCount: results.length,
+
+    validCount: results.filter(
+      (row) => row.status !== 'error'
+    ).length,
+
+    warningCount: results.filter(
+      (row) => row.status === 'warning'
+    ).length,
+
+    errorCount: results.filter(
+      (row) => row.status === 'error'
+    ).length
+  };
+}
+
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 function formatFileSize(bytes) {
@@ -125,11 +361,17 @@ function Imports() {
   const fileInputRef = useRef(null);
 
   const [tenantId, setTenantId] = useState('');
-  const [sourceType, setSourceType] = useState('crm');
+
+  // Система, из которой поступают данные
+  const [sourceSystem, setSourceSystem] = useState('crm');
+
+  // Способ передачи данных
+  const [transferMethod, setTransferMethod] = useState('file');
 
   const [file, setFile] = useState(null);
   const [columns, setColumns] = useState([]);
   const [preview, setPreview] = useState([]);
+  const [parsedRows, setParsedRows] = useState([]);
   const [fieldMapping, setFieldMapping] = useState({});
   const [totalRows, setTotalRows] = useState(0);
 
@@ -238,10 +480,10 @@ function Imports() {
       }
 
       setColumns(headers);
+      setParsedRows(rows);
       setTotalRows(rows.length);
       setPreview(rows.slice(0, 5));
 
-      // Автоматически сопоставляем названия столбцов
       setFieldMapping(buildDefaultMapping(headers));
 
       if (parseErrors > 0) {
@@ -273,6 +515,7 @@ function Imports() {
       fileInputRef.current.value = '';
     }
     setFieldMapping({});
+    setParsedRows([]);
   };
 
   // Обработка перетаскивания
@@ -294,6 +537,23 @@ function Imports() {
 
   const mappedFieldsCount = Object.values(fieldMapping)
     .filter(Boolean).length;
+  // Результаты проверки всех записей
+const validationReport = useMemo(() => {
+  return validateImportRows(
+    parsedRows,
+    fieldMapping,
+    tenantId
+  );
+}, [parsedRows, fieldMapping, tenantId]);
+
+// Показываем только записи с проблемами
+const displayedValidationRows = validationReport.rows
+  .filter(
+    (row) =>
+      row.status === 'error' ||
+      row.status === 'warning'
+  )
+  .slice(0, 10);
 
   return (
     <div className="imports-page">
@@ -742,6 +1002,187 @@ function Imports() {
 
   </section>
   )}
+  
+{/* ПРОВЕРКА КАЧЕСТВА ДАННЫХ */}
+
+{parsedRows.length > 0 && (
+  <section className="content-card validation-card">
+
+    <div className="import-section-heading">
+      <div>
+        <h2>Проверка качества данных</h2>
+        <p>
+          Результаты проверки всех записей загруженного файла.
+        </p>
+      </div>
+
+      <span className={
+        validationReport.errorCount === 0 &&
+        validationReport.mappingIssues.length === 0
+          ? 'validation-badge success'
+          : 'validation-badge error'
+      }>
+        {validationReport.errorCount === 0 &&
+        validationReport.mappingIssues.length === 0
+          ? 'Проверка пройдена'
+          : 'Найдены проблемы'}
+      </span>
+    </div>
+
+    {/* Общие показатели */}
+
+    <div className="validation-stats">
+
+      <div className="validation-stat">
+        <span>Всего записей</span>
+        <strong>
+          {validationReport.totalCount}
+        </strong>
+      </div>
+
+      <div className="validation-stat accepted">
+        <span>Принято</span>
+        <strong>
+          {validationReport.validCount}
+        </strong>
+      </div>
+
+      <div className="validation-stat warning">
+        <span>С предупреждениями</span>
+        <strong>
+          {validationReport.warningCount}
+        </strong>
+      </div>
+
+      <div className="validation-stat rejected">
+        <span>Отклонено</span>
+        <strong>
+          {validationReport.errorCount}
+        </strong>
+      </div>
+
+    </div>
+
+    {/* Ошибки сопоставления */}
+
+    {validationReport.mappingIssues.length > 0 && (
+      <div className="validation-alert error">
+        <AlertCircle size={18} />
+
+        <div>
+          <strong>Проблемы с настройкой полей</strong>
+
+          {validationReport.mappingIssues.map(
+            (issue, index) => (
+              <p key={index}>{issue}</p>
+            )
+          )}
+        </div>
+      </div>
+    )}
+
+    {/* Если есть ошибки в записях */}
+
+    {displayedValidationRows.length > 0 && (
+      <div className="validation-results">
+
+        <h3>Записи, требующие внимания</h3>
+
+        <div className="table-wrapper">
+          <table className="validation-table">
+
+            <thead>
+              <tr>
+                <th>Строка</th>
+                <th>Гость</th>
+                <th>Телефон</th>
+                <th>Email</th>
+                <th>Статус</th>
+                <th>Причина</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {displayedValidationRows.map((row) => (
+                <tr key={row.rowNumber}>
+                  <td>{row.rowNumber}</td>
+
+                  <td>
+                    {row.fullName || '—'}
+                  </td>
+
+                  <td>
+                    {row.phone || '—'}
+                  </td>
+
+                  <td>
+                    {row.email || '—'}
+                  </td>
+
+                  <td>
+                    <span className={
+                      `validation-row-status ${row.status}`
+                    }>
+                      {row.status === 'error'
+                        ? 'Ошибка'
+                        : 'Предупреждение'}
+                    </span>
+                  </td>
+
+                  <td>
+                    {[
+                      ...row.errors,
+                      ...row.warnings
+                    ].join(' ')}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+
+          </table>
+        </div>
+
+        {validationReport.errorCount +
+          validationReport.warningCount > 10 && (
+          <p className="validation-more">
+            Показаны первые 10 записей с проблемами.
+            Всего таких записей: {
+              validationReport.errorCount +
+              validationReport.warningCount
+            }.
+          </p>
+        )}
+
+      </div>
+    )}
+
+    {/* Успешная проверка */}
+
+    {validationReport.errorCount === 0 &&
+      validationReport.mappingIssues.length === 0 && (
+        <div className="validation-alert success">
+          <CheckCircle2 size={19} />
+
+          <div>
+            <strong>Критических ошибок не обнаружено</strong>
+            <p>
+              Все {validationReport.validCount} записей
+              прошли предварительную проверку.
+            </p>
+          </div>
+        </div>
+      )}
+
+    <div className="validation-footer">
+      <AlertCircle size={16} />
+      <span>
+        Предварительная проверка выполняется в браузере.
+        Окончательная валидация будет выполняться Backend.
+      </span>
+    </div>
+
+  </section>
+)}
 
     </div>
   );
