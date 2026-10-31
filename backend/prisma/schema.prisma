@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ImportStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum CustomerEventType {
+  VISIT
+  PURCHASE
+  BOOKING
+}
+
+model Workspace {
+  id String @id @default(uuid()) @db.Uuid
+  name String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenants Tenant[]
+  customers Customer[]
+  segments Segment[]
+  recommendations Recommendation[]
+  exports Export[]
+  notifications Notification[]
+  settings WorkspaceSetting[]
+}
+
+model Tenant {
+  id String @id @default(uuid()) @db.Uuid
+  workspaceId String @db.Uuid
+  name String
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  dataSources DataSource[]
+  events CustomerEvent[]
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model DataSource {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  name String
+  type String
+  isActive Boolean @default(true)
+  metadata Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  imports Import[]
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model Import {
+  id String @id @default(uuid()) @db.Uuid
+  dataSourceId String @db.Uuid
+  fileName String?
+  transferMethod String?
+  status ImportStatus @default(PENDING)
+  totalRows Int @default(0)
+  acceptedRows Int @default(0)
+  rejectedRows Int @default(0)
+  metadata Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  dataSource DataSource @relation(fields: [dataSourceId], references: [id], onDelete: Restrict)
+  events CustomerEvent[]
+  @@index([dataSourceId])
+  @@index([createdAt])
+}
+
+model Customer {
+  id String @id @default(uuid()) @db.Uuid
+  workspaceId String @db.Uuid
+  fullName String?
+  phone String?
+  phoneNormalized String?
+  email String?
+  emailNormalized String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  events CustomerEvent[]
+  @@index([workspaceId])
+  @@index([workspaceId, phoneNormalized])
+  @@index([workspaceId, emailNormalized])
+}
+
+model CustomerEvent {
+  id String @id @default(uuid()) @db.Uuid
+  customerId String @db.Uuid
+  tenantId String @db.Uuid
+  importId String @db.Uuid
+  type CustomerEventType
+  occurredAt DateTime?
+  amount Decimal? @db.Decimal(12, 2)
+  metadata Json?
+  createdAt DateTime @default(now())
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  import Import @relation(fields: [importId], references: [id], onDelete: Restrict)
+  @@index([customerId])
+  @@index([tenantId])
+  @@index([importId])
+  @@index([occurredAt])
+}
+
+model Segment {
+  id String @id @default(uuid()) @db.Uuid
+  workspaceId String @db.Uuid
+  name String
+  description String?
+  conditions Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  recommendations Recommendation[]
+  exports Export[]
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model Recommendation {
+  id String @id @default(uuid()) @db.Uuid
+  workspaceId String @db.Uuid
+  segmentId String? @db.Uuid
+  sourceTenantName String
+  targetTenantName String
+  explanation String
+  metrics Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  segment Segment? @relation(fields: [segmentId], references: [id], onDelete: SetNull)
+  exports Export[]
+  @@index([workspaceId])
+  @@index([segmentId])
+}
+
+model Export {
+  id String @id @default(uuid()) @db.Uuid
+  workspaceId String @db.Uuid
+  segmentId String? @db.Uuid
+  recommendationId String? @db.Uuid
+  audienceName String
+  format String
+  customersCount Int @default(0)
+  fields Json?
+  metadata Json?
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  segment Segment? @relation(fields: [segmentId], references: [id], onDelete: SetNull)
+  recommendation Recommendation? @relation(fields: [recommendationId], references: [id], onDelete: SetNull)
+  @@index([workspaceId])
+  @@index([segmentId])
+  @@index([recommendationId])
+}
+
+model Notification {
+  id String @id @default(uuid()) @db.Uuid
+  workspaceId String @db.Uuid
+  type String
+  title String
+  message String
+  path String?
+  isRead Boolean @default(false)
+  metadata Json?
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, isRead])
+  @@index([createdAt])
+}
+
+model WorkspaceSetting {
+  id String @id @default(uuid()) @db.Uuid
+  workspaceId String @db.Uuid
+  key String
+  value Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
+}
