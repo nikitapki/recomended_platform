@@ -397,3 +397,122 @@
     display: none;
   }
 }
+
+/* СОПОСТАВЛЕНИЕ ПОЛЕЙ */
+
+.mapping-card {
+  margin-top: 20px;
+  padding: 25px;
+}
+
+.mapping-counter {
+  background: #edf2ff;
+  color: #4269d5;
+  padding: 8px 12px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mapping-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 130px;
+  gap: 15px;
+  padding: 12px 10px;
+  background: #f8f9fc;
+  color: #8994a5;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.mapping-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 130px;
+  align-items: center;
+  gap: 15px;
+  padding: 14px 10px;
+  border-bottom: 1px solid #edf0f5;
+}
+
+.mapping-field-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.mapping-field-info strong {
+  font-size: 12px;
+  color: #344258;
+}
+
+.mapping-field-info span {
+  font-size: 10px;
+  color: #929eaf;
+}
+
+.mapping-row select {
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid #e4e9f0;
+  border-radius: 7px;
+  background: white;
+  color: #526075;
+  font-size: 11px;
+  outline: none;
+}
+
+.mapping-row select:focus {
+  border-color: #4269d5;
+}
+
+.mapping-status {
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.mapping-status.mapped {
+  color: #36945b;
+}
+
+.mapping-status.unmapped {
+  color: #a1aaba;
+}
+
+.success-message {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  background: #eaf8ef;
+  color: #36945b;
+  padding: 12px;
+  border-radius: 7px;
+  font-size: 11px;
+  margin-top: 16px;
+}
+
+.mapping-footer {
+  color: #929eaf;
+  font-size: 10px;
+  margin-top: 17px;
+}
+
+@media (max-width: 700px) {
+  .mapping-header {
+    display: none;
+  }
+
+  .mapping-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .mapping-status {
+    padding-bottom: 5px;
+  }
+
+  .mapping-card {
+    padding: 17px;
+  }
+}

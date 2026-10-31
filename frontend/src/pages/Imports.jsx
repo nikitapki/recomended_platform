@@ -24,6 +24,92 @@ const TENANTS = [
   { id: 5, name: 'Beauty Studio' }
 ];
 
+// Поля единой структуры платформы
+const TARGET_FIELDS = [
+  {
+    key: 'full_name',
+    label: 'ФИО гостя',
+    hint: 'Имя и фамилия'
+  },
+  {
+    key: 'phone',
+    label: 'Телефон',
+    hint: 'Контактный номер гостя'
+  },
+  {
+    key: 'email',
+    label: 'Email',
+    hint: 'Электронная почта гостя'
+  },
+  {
+    key: 'event_type',
+    label: 'Тип события',
+    hint: 'Покупка, посещение или бронирование'
+  },
+  {
+    key: 'event_date',
+    label: 'Дата события',
+    hint: 'Дата посещения или покупки'
+  },
+  {
+    key: 'amount',
+    label: 'Сумма',
+    hint: 'Стоимость покупки или бронирования'
+  }
+];
+
+// Возможные названия столбцов в файлах арендаторов
+const HEADER_ALIASES = {
+  full_name: [
+    'full_name', 'fullname', 'name',
+    'fio', 'фио', 'имя', 'фамилияиимя'
+  ],
+  phone: [
+    'phone', 'mobile', 'phonenumber',
+    'телефон', 'номер телефона'
+  ],
+  email: [
+    'email', 'mail', 'почта',
+    'электронная почта'
+  ],
+  event_type: [
+    'event_type', 'eventtype', 'type',
+    'тип события', 'событие'
+  ],
+  event_date: [
+    'event_date', 'date', 'occurred_at',
+    'datetime', 'дата', 'дата события'
+  ],
+  amount: [
+    'amount', 'sum', 'price',
+    'сумма', 'стоимость'
+  ]
+};
+
+// Приводим название столбца к единому виду
+function normalizeHeader(value) {
+  return String(value)
+    .toLowerCase()
+    .replace(/[^a-zа-яё0-9]/gi, '');
+}
+
+// Автоматическое сопоставление
+function buildDefaultMapping(headers) {
+  return Object.fromEntries(
+    TARGET_FIELDS.map((field) => {
+      const aliases = HEADER_ALIASES[field.key].map(
+        normalizeHeader
+      );
+
+      const matchedColumn = headers.find((header) =>
+        aliases.includes(normalizeHeader(header))
+      );
+
+      return [field.key, matchedColumn || ''];
+    })
+  );
+}
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 function formatFileSize(bytes) {
@@ -44,6 +130,7 @@ function Imports() {
   const [file, setFile] = useState(null);
   const [columns, setColumns] = useState([]);
   const [preview, setPreview] = useState([]);
+  const [fieldMapping, setFieldMapping] = useState({});
   const [totalRows, setTotalRows] = useState(0);
 
   const [error, setError] = useState('');
@@ -154,6 +241,9 @@ function Imports() {
       setTotalRows(rows.length);
       setPreview(rows.slice(0, 5));
 
+      // Автоматически сопоставляем названия столбцов
+      setFieldMapping(buildDefaultMapping(headers));
+
       if (parseErrors > 0) {
         setWarning(
           `При чтении обнаружено ошибок: ${parseErrors}. Проверьте исходный файл.`
@@ -182,6 +272,7 @@ function Imports() {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+    setFieldMapping({});
   };
 
   // Обработка перетаскивания
@@ -197,6 +288,12 @@ function Imports() {
   const selectedTenant = TENANTS.find(
     (tenant) => tenant.id === Number(tenantId)
   );
+  const hasContactField = Boolean(
+  fieldMapping.phone || fieldMapping.email
+  );
+
+  const mappedFieldsCount = Object.values(fieldMapping)
+    .filter(Boolean).length;
 
   return (
     <div className="imports-page">
@@ -542,6 +639,109 @@ function Imports() {
 
         </section>
       )}
+    
+{/* СОПОСТАВЛЕНИЕ ПОЛЕЙ */}
+
+{columns.length > 0 && (
+  <section className="content-card mapping-card">
+
+    <div className="import-section-heading">
+
+      <div>
+        <h2>Сопоставление полей</h2>
+        <p>
+          Укажите соответствие столбцов файла
+          единой структуре платформы.
+        </p>
+      </div>
+
+      <span className="mapping-counter">
+        {mappedFieldsCount} из {TARGET_FIELDS.length} сопоставлено
+      </span>
+
+    </div>
+
+    <div className="mapping-header">
+      <span>Поле платформы</span>
+      <span>Столбец исходного файла</span>
+      <span>Статус</span>
+    </div>
+
+    <div className="mapping-list">
+
+      {TARGET_FIELDS.map((field) => {
+        const selectedColumn = fieldMapping[field.key];
+
+        return (
+          <div className="mapping-row" key={field.key}>
+
+            <div className="mapping-field-info">
+              <strong>{field.label}</strong>
+              <span>{field.hint}</span>
+            </div>
+
+            <select
+              value={selectedColumn || ''}
+              onChange={(event) => {
+                setFieldMapping((previous) => ({
+                  ...previous,
+                  [field.key]: event.target.value
+                }));
+              }}
+            >
+
+              <option value="">
+                Не сопоставлено
+              </option>
+
+              {columns.map((column) => (
+                <option key={column} value={column}>
+                  {column}
+                </option>
+              ))}
+
+            </select>
+
+            <span
+              className={
+                selectedColumn
+                  ? 'mapping-status mapped'
+                  : 'mapping-status unmapped'
+              }
+            >
+              {selectedColumn
+                ? 'Сопоставлено'
+                : 'Не выбрано'}
+            </span>
+
+          </div>
+        );
+      })}
+
+    </div>
+
+    {!hasContactField && (
+      <div className="import-message warning-message">
+        <AlertCircle size={18} />
+        Необходимо сопоставить хотя бы один
+        идентификатор гостя: телефон или email.
+      </div>
+    )}
+
+    {hasContactField && (
+      <div className="import-message success-message">
+        <CheckCircle2 size={18} />
+        Основное поле идентификации гостя сопоставлено.
+      </div>
+    )}
+
+    <div className="mapping-footer">
+      Сопоставление будет передано Backend
+      вместе с исходным файлом.
+    </div>
+
+  </section>
+  )}
 
     </div>
   );
