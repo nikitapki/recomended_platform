@@ -8,7 +8,7 @@ import PlaceholderPage from './pages/PlaceholderPage';
 
 import './App.css';
 import Imports from './pages/Imports';
-
+import Customers from './pages/Customers';
 function App() {
   return (
     <Routes>
@@ -21,14 +21,9 @@ function App() {
         />
 
         <Route
-          path="/customers"
-          element={
-            <PlaceholderPage
-              title="Гости"
-              description="Единые профили и история посещений гостей."
-            />
-          }
-        />
+  path="/customers"
+  element={<Customers />}
+    />
 
         <Route
           path="/segments"

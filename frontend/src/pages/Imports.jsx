@@ -2,7 +2,7 @@
 import { useMemo, useRef, useState } from 'react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-
+import { saveImportedEvents } from '../services/customerStorage.js';
 import {
   UploadCloud,
   FileSpreadsheet,
@@ -593,46 +593,66 @@ const canConfirmImport =
   validationReport.importableCount > 0;
 
 
+
 const handleConfirmImport = () => {
   if (!canConfirmImport) return;
 
-  const result = {
-    id: crypto.randomUUID(),
+  try {
+    const importId = crypto.randomUUID();
 
-    fileName: file.name,
-    tenantName: selectedTenant?.name || 'Неизвестный арендатор',
+    // Сохраняем все принятые события гостей
+    const importedEventsCount = saveImportedEvents({
+      rows: parsedRows,
+      mapping: fieldMapping,
+      validationRows: validationReport.rows,
+      tenant: selectedTenant,
+      importId
+    });
 
-    sourceSystem,
-    transferMethod,
+    const result = {
+      id: importId,
 
-    totalRows: validationReport.totalCount,
-    cleanRows: validationReport.validCount,
-    importableRows: validationReport.importableCount,
-    warningRows: validationReport.warningCount,
-    rejectedRows: validationReport.errorCount,
+      fileName: file.name,
+      tenantName: selectedTenant?.name || 'Неизвестный арендатор',
 
-    confirmedAt: new Date().toLocaleString('ru-RU'),
+      sourceSystem,
+      transferMethod,
 
-    status: 'Подготовлено локально'
-  };
+      totalRows: validationReport.totalCount,
+      cleanRows: validationReport.validCount,
+      importableRows: validationReport.importableCount,
+      warningRows: validationReport.warningCount,
+      rejectedRows: validationReport.errorCount,
 
-  setImportResult(result);
+      importedEventsCount,
 
-  setImportHistory((previous) => {
-    const updated = [result, ...previous];
+      confirmedAt: new Date().toLocaleString('ru-RU'),
 
-    try {
+      status: 'Подготовлено локально'
+    };
+
+    setImportResult(result);
+
+    setImportHistory((previous) => {
+      const updated = [result, ...previous];
+
       localStorage.setItem(
         IMPORT_HISTORY_STORAGE_KEY,
         JSON.stringify(updated)
       );
-    } catch (error) {
-      console.error('Не удалось сохранить историю:', error);
-    }
 
-    return updated;
-  });
+      return updated;
+    });
+
+  } catch (error) {
+    console.error('Ошибка сохранения импорта:', error);
+
+    setError(
+      'Не удалось сохранить импортированные данные в браузере.'
+    );
+  }
 };
+
 
 
   return (
