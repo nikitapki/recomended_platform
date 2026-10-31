@@ -372,12 +372,12 @@ function mergeImportedEventsWithCustomers(
     }
 
     // Сначала показываем более поздние события
-    customer.events.sort((a, b) => {
-      return (
-        (getDateTimestamp(b.date) || 0) -
-        (getDateTimestamp(a.date) || 0)
-      );
-    });
+    customer.events.sort((leftEvent, rightEvent) => {
+  const leftDate = getDateTimestamp(leftEvent.date) || 0;
+  const rightDate = getDateTimestamp(rightEvent.date) || 0;
+
+  return rightDate - leftDate;
+});
   });
 
   return customers;
@@ -396,6 +396,16 @@ function formatMoney(value) {
 }
 
 function Customers() {
+
+  // Объединяем демонстрационных гостей
+  // с событиями из загруженных файлов
+  const [customers] = useState(() =>
+    mergeImportedEventsWithCustomers(
+      MOCK_CUSTOMERS,
+      getImportedEvents()
+    )
+  );
+
   const [search, setSearch] = useState('');
   const [tenantFilter, setTenantFilter] = useState('all');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -796,10 +806,5 @@ function Customers() {
     </div>
   );
 }
-const [customers] = useState(() =>
-  mergeImportedEventsWithCustomers(
-    MOCK_CUSTOMERS,
-    getImportedEvents()
-  )
-);
+
 export default Customers;
