@@ -1,0 +1,20 @@
+2026-11-01 07:01:08.981 +07 [15204] LOG:  starting PostgreSQL 18.6 on x86_64-windows, compiled by msvc-19.44.35228, 64-bit
+
+2026-11-01 07:01:09.000 +07 [15204] LOG:  listening on IPv6 address "::1", port 5432
+
+2026-11-01 07:01:09.000 +07 [15204] LOG:  listening on IPv4 address "127.0.0.1", port 5432
+
+2026-11-01 07:01:09.318 +07 [10092] LOG:  database system was shut down at 2026-11-01 00:17:21 +07
+
+2026-11-01 07:01:09.386 +07 [15204] LOG:  database system is ready to accept connections
+
+PostgreSQL (встроенный) запущен: localhost:5432
+База "mall_insight" создана
+2026-11-01 07:01:49.244 +07 [15204] LOG:  background worker "logical replication launcher" (PID 18248) was terminated by exception 0xC000013A
+2026-11-01 07:01:49.244 +07 [15204] HINT:  See C include file "ntstatus.h" for a description of the hexadecimal value.
+2026-11-01 07:01:49.244 +07 [15204] LOG:  terminating any other active server processes
+
+2026-11-01 07:01:49.277 +07 [15204] LOG:  all server processes terminated; reinitializing
+
+2026-11-01 07:01:49.475 +07 [6340] LOG:  database system was interrupted; last known up at 2026-11-01 07:01:09 +07
+

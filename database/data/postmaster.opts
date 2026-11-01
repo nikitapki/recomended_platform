@@ -1,0 +1,1 @@
+C:/source/web_repos/hackatons/sib_code/recomended_platform/backend/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe "-D" "C:\source\web_repos\hackatons\sib_code\recomended_platform\database\data" "-p" "5432"
