@@ -1,4 +1,5 @@
 
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 
 import {
@@ -11,6 +12,11 @@ import {
   Building2,
   Settings
 } from 'lucide-react';
+import {
+  getSettings,
+  SETTINGS_STORAGE_KEY,
+  SETTINGS_UPDATED_EVENT
+} from '../services/settingsService.js';
 
 const menuItems = [
   {
@@ -46,6 +52,24 @@ const menuItems = [
 ];
 
 function Sidebar() {
+  const [company, setCompany] = useState(() => getSettings().company);
+
+  useEffect(() => {
+    const refresh = () => setCompany(getSettings().company);
+    const handleStorage = (event) => {
+      if (event.key === SETTINGS_STORAGE_KEY) refresh();
+    };
+    window.addEventListener(SETTINGS_UPDATED_EVENT, refresh);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener(SETTINGS_UPDATED_EVENT, refresh);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
+  const initials = company.name.split(/\s+/).filter(Boolean).slice(0, 2)
+    .map((part) => part[0]).join('').toUpperCase() || 'УК';
+
   return (
     <aside className="sidebar">
 
@@ -91,17 +115,20 @@ function Sidebar() {
           СИСТЕМА
         </div>
 
-        <div className="sidebar-footer-item">
+        <NavLink
+          to="/settings"
+          className={({ isActive }) => isActive ? 'sidebar-footer-item active' : 'sidebar-footer-item'}
+        >
           <Settings size={19} />
           <span>Настройки</span>
-        </div>
+        </NavLink>
 
         <div className="sidebar-user">
-          <div className="user-avatar">УК</div>
+          <div className="user-avatar">{initials}</div>
 
           <div>
-            <div className="user-name">Управляющая компания</div>
-            <div className="user-role">Администратор</div>
+            <div className="user-name">{company.name}</div>
+            <div className="user-role">{company.role}</div>
           </div>
         </div>
       </div>
